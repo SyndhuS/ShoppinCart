@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using System.Net.Http.Json;
 using System.IO;
 
 namespace ShoppingCart
@@ -21,9 +22,9 @@ namespace ShoppingCart
             var url = $"{BaseUrl}/{Uri.EscapeDataString(product)}.json";
             using var resp = await _httpClient.GetAsync(url).ConfigureAwait(false);
             resp.EnsureSuccessStatusCode();
-            using var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false);
-            using var doc = await JsonDocument.ParseAsync(stream).ConfigureAwait(false);
-            var price = FindFirstNumber(doc.RootElement);
+            // Read response directly into a JsonElement and traverse it to find the first number.
+            var root = await resp.Content.ReadFromJsonAsync<JsonElement>().ConfigureAwait(false);
+            var price = FindFirstNumber(root);
             if (price is null) throw new InvalidOperationException("Price not found in API response.");
             return price.Value;
         }

@@ -20,6 +20,13 @@ namespace ShoppingCartTest
                 };
             }
         }
+        public class ThrowingTaxCalculator : ITaxCalculator
+        {
+            public decimal CalculateTax(decimal subtotal, decimal totalBeforeTax)
+            {
+                throw new InvalidOperationException("tax service failed");
+            }
+        }
         [Test]
         public async Task SampleScenario_ComputesExpectedTotals()
         {
@@ -51,6 +58,35 @@ namespace ShoppingCartTest
             Assert.AreEqual(5.04m, cart.Subtotal);
             Assert.AreEqual(0.63m, cart.Tax); // 5.04 * 0.125 = 0.63 exactly
             Assert.AreEqual(5.67m, cart.Total);
+        }
+
+        [Test]
+        public async Task AddAsync_InvalidArguments_Throws()
+        {
+            var client = new TestPriceClient();
+            var cart = new ShoppingCart.ShoppingCart(client);
+
+            // invalid quantities
+            Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await cart.AddAsync("cornflakes", 0));
+            Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () => await cart.AddAsync("cornflakes", -1));
+
+            // null or whitespace product
+            Assert.ThrowsAsync<ArgumentNullException>(async () => await cart.AddAsync(null!, 1));
+            Assert.ThrowsAsync<ArgumentNullException>(async () => await cart.AddAsync("", 1));
+            Assert.ThrowsAsync<ArgumentNullException>(async () => await cart.AddAsync("   ", 1));
+        }
+
+        [Test]
+        public async Task TaxCalculator_Throws_IsPropagated()
+        {
+            var client = new TestPriceClient();
+            var taxCalc = new ThrowingTaxCalculator();
+            var cart = new ShoppingCart.ShoppingCart(client, null, taxCalc);
+
+            await cart.AddAsync("cornflakes", 1);
+
+            Assert.Throws<InvalidOperationException>(() => { var _ = cart.Tax; });
+            Assert.Throws<InvalidOperationException>(() => { var _ = cart.Total; });
         }
     }
 }
